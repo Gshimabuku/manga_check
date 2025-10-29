@@ -168,6 +168,36 @@ def main():
                 st.error(f"❌ 「{SPREADSHEET_NAME}」シートが見つかりません。スプレッドシート名を確認するか、サービスアカウントにアクセス権限を付与してください。")
         except Exception as e:
             st.error(f"❌ スプレッドシート確認エラー: {e}")
+    
+    # スプレッドシートの内容確認ボタン
+    if st.button("📄 スプレッドシートの内容確認"):
+        try:
+            gc = get_gspread_client()
+            st.info("スプレッドシートの内容を取得中...")
+            try:
+                spreadsheet = gc.open(SPREADSHEET_NAME)
+                worksheet = spreadsheet.get_worksheet(0)
+                rows = worksheet.get_all_values()
+                
+                if not rows:
+                    st.warning("⚠️ スプレッドシートにデータがありません")
+                else:
+                    import pandas as pd
+                    # ヘッダー行がある場合は最初の行をヘッダーとして使用
+                    if len(rows) > 1:
+                        df = pd.DataFrame(rows[1:], columns=rows[0])
+                        st.success(f"✅ {len(rows)-1}件のデータを取得しました")
+                    else:
+                        df = pd.DataFrame(rows)
+                        st.success(f"✅ {len(rows)}件のデータを取得しました")
+                    
+                    st.subheader("📊 スプレッドシートの内容")
+                    st.dataframe(df, use_container_width=True)
+                    
+            except SpreadsheetNotFound:
+                st.error(f"❌ 「{SPREADSHEET_NAME}」シートが見つかりません。スプレッドシート名を確認するか、サービスアカウントにアクセス権限を付与してください。")
+        except Exception as e:
+            st.error(f"❌ スプレッドシート内容取得エラー: {e}")
 
     if st.button("最新刊チェック開始 ▶️"):
         st.info(f"「{SPREADSHEET_NAME}」スプレッドシートを取得中...")
