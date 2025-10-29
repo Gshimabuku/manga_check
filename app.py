@@ -150,10 +150,10 @@ def main():
             spreadsheet = gc.open(spreadsheet_name)
             worksheet = spreadsheet.get_worksheet(0)
             st.success(f"✅ スプレッドシート「{spreadsheet_name}」に接続しました")
-        except gspread.SpreadsheetNotFound:
+        except SpreadsheetNotFound:
             st.error(f"❌ スプレッドシート「{spreadsheet_name}」が見つかりません。名前を確認するか、上記のボタンで利用可能なスプレッドシートを確認してください。")
             return
-        except gspread.APIError as e:
+        except APIError as e:
             st.error(f"❌ Google Sheets APIエラー: {e}")
             st.markdown("""
             **考えられる原因:**
