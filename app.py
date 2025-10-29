@@ -1,67 +1,83 @@
 import streamlit as st
-import pandas as pd
-import requests
-import io
+import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+import requests
 
-# --- タイトル ---
-st.title("📚 漫画最新刊チェックアプリ")
+# --- APIキー・認証設定 ---
+API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
+API_KEY = st.secrets["rakuten"]["applicationId"]
+AFFILIATE_ID = st.secrets["rakuten"]["affiliateId"]
 
-# --- Drive API認証 ---
-scopes = ["https://www.googleapis.com/auth/drive.readonly"]
-creds = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"], scopes=scopes
-)
-drive_service = build("drive", "v3", credentials=creds)
 
-# --- 対象ファイルID（GoogleドライブURLの d/○○/ 部分） ---
-FILE_ID = "ここにファイルIDを入力"
+# --- Google Sheets認証 ---
+def get_gspread_client():
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    )
+    return gspread.authorize(creds)
 
-# --- ファイル取得 ---
-@st.cache_data
-def load_excel_from_drive(file_id):
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-    fh.seek(0)
-    return pd.read_excel(fh)
-
-df = load_excel_from_drive(FILE_ID)
-st.write("### 📋 現在のスプレッドシート内容")
-st.dataframe(df)
 
 # --- 楽天Books API ---
-API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
-API_KEY = st.secrets["rakuten"]["API_KEY"]
+def get_books(params, search_title, num, no):
+    params["page"] = 1
+    response = requests.get(API_ENDPOINT, params=params)
+    if response.status_code != 200:
+        st.error(f"エラー: {response.status_code} (page=1)")
+        return no
 
-if st.button("🔍 最新刊をチェック"):
-    updated_list = []
-    for _, row in df.iterrows():
-        title = row.get("タイトル") or row.get("作品名")
-        if not title:
-            continue
+    data = response.json()
+    page_count = data.get("pageCount", 1)
+    books = data.get("Items", [])
 
-        params = {
-            "applicationId": API_KEY,
-            "title": title,
-            "hits": 1,
-            "sort": "-releaseDate",
-        }
-        res = requests.get(API_ENDPOINT, params=params)
-        items = res.json().get("Items", [])
+    if page_count >= 1:
+        num = int(num) + 1
+        search_title = search_title.replace("num", str(num))
+        for book_item in books:
+            book = book_item["Item"]
+            if search_title in book["title"]:
+                no += 1
+                st.write(f'{no} : {book["title"]} | ISBN: {book["isbn"]} | 出版日: {book["salesDate"]}')
+                return no
+    return no
 
-        if items:
-            latest_title = items[0]["Item"]["title"]
-            if latest_title != title:
-                updated_list.append({"旧タイトル": title, "新タイトル": latest_title})
 
-    if updated_list:
-        st.warning("📗 新刊が出ている作品：")
-        st.dataframe(pd.DataFrame(updated_list))
-    else:
-        st.success("すべて最新です！")
+# --- メイン ---
+def main():
+    st.title("📚 楽天Books 最新巻チェック")
+
+    if st.button("最新刊チェック開始 ▶️"):
+        st.info("Googleスプレッドシートを取得中...")
+
+        gc = get_gspread_client()
+        spreadsheet = gc.open("作品一覧")
+        worksheet = spreadsheet.get_worksheet(0)
+
+        rows = worksheet.get_all_values()
+        st.success(f"{len(rows)-1}件の作品データを取得しました。")
+
+        data = []
+        for row in rows[1:]:
+            title = row[0] if len(row) > 0 else ""
+            search_title = row[1] if len(row) > 1 else ""
+            number = row[2] if len(row) > 2 else ""
+            data.append({"title": title, "search_title": search_title, "number": number})
+
+        no = 0
+        st.subheader("🔎 検索結果")
+        for item in data:
+            params = {
+                'applicationId': API_KEY,
+                'affiliateId': AFFILIATE_ID,
+                'title': item["title"],
+                'sort': '-releaseDate',
+                'hits': 30
+            }
+            result = get_books(params, item["search_title"], item["number"], int(no))
+            no = int(result)
+
+        st.success("✅ 最新刊チェックが完了しました！")
+
+
+if __name__ == "__main__":
+    main()
