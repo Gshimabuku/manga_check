@@ -103,6 +103,7 @@ def get_books(params, search_title, num, no):
             if search_title in book["title"]:
                 return {
                     "title": book["title"],
+                    "volume": str(num),  # 巻数
                     "isbn": book["isbn"],
                     "sales_date": book["salesDate"]
                 }
@@ -228,10 +229,10 @@ def main():
                 result = get_books(params, item["search_title"], item["number"], 0)
                 if result:
                     results.append({
-                        "作品名": item["title"],
-                        "最新刊タイトル": result["title"],
-                        "ISBN": result["isbn"],
-                        "出版日": result["sales_date"]
+                        "作品名": result["title"],
+                        "巻数": result["volume"],
+                        "出版日": result["sales_date"],
+                        "ISBN": result["isbn"]
                     })
             except Exception as e:
                 st.error(f"❌ 「{item['title']}」の検索でエラー: {e}")
