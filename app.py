@@ -2,19 +2,58 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
+import os
 
 # --- APIキー・認証設定 ---
 API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
 
 # シークレット設定の確認とエラーハンドリング
+def get_api_keys():
+    """APIキーを複数の方法で取得を試みる"""
+    api_key = None
+    affiliate_id = None
+    
+    # 方法1: Streamlit secrets
+    try:
+        api_key = st.secrets["rakuten"]["applicationId"]
+        affiliate_id = st.secrets["rakuten"]["affiliateId"]
+        st.success("✅ Streamlit secretsから設定を読み込みました")
+        return api_key, affiliate_id
+    except KeyError:
+        st.warning("⚠️ Streamlit secretsで楽天設定が見つかりません")
+    except Exception as e:
+        st.warning(f"⚠️ Streamlit secrets読み込みエラー: {e}")
+    
+    # 方法2: 環境変数
+    try:
+        api_key = os.getenv("RAKUTEN_APPLICATION_ID")
+        affiliate_id = os.getenv("RAKUTEN_AFFILIATE_ID")
+        if api_key and affiliate_id:
+            st.success("✅ 環境変数から設定を読み込みました")
+            return api_key, affiliate_id
+        else:
+            st.warning("⚠️ 環境変数に楽天設定が見つかりません")
+    except Exception as e:
+        st.warning(f"⚠️ 環境変数読み込みエラー: {e}")
+    
+    # 方法3: デフォルト値（開発用）
+    if not api_key or not affiliate_id:
+        st.error("❌ 楽天APIキーが見つかりません。以下のいずれかの方法で設定してください：")
+        st.markdown("""
+        **設定方法:**
+        1. `.streamlit/secrets.toml` に設定を追加
+        2. 環境変数 `RAKUTEN_APPLICATION_ID` と `RAKUTEN_AFFILIATE_ID` を設定
+        3. Streamlit Cloud の場合、アプリ設定でSecretsを追加
+        """)
+        st.stop()
+    
+    return api_key, affiliate_id
+
+# 設定取得
 try:
-    API_KEY = st.secrets["rakuten"]["applicationId"]
-    AFFILIATE_ID = st.secrets["rakuten"]["affiliateId"]
-except KeyError as e:
-    st.error(f"設定エラー: 楽天APIキーが見つかりません。管理者に連絡してください。\nエラー詳細: {e}")
-    st.stop()
+    API_KEY, AFFILIATE_ID = get_api_keys()
 except Exception as e:
-    st.error(f"予期しないエラーが発生しました: {e}")
+    st.error(f"設定エラー: {e}")
     st.stop()
 
 
@@ -73,7 +112,7 @@ def main():
         st.info("Googleスプレッドシートを取得中...")
 
         gc = get_gspread_client()
-        spreadsheet = gc.open("作品一覧")
+        spreadsheet = gc.open("works")
         worksheet = spreadsheet.get_worksheet(0)
 
         rows = worksheet.get_all_values()
