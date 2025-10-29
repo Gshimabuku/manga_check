@@ -13,6 +13,7 @@ import os
 
 # --- APIキー・認証設定 ---
 API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
+SPREADSHEET_NAME = "作品一覧"  # 固定のスプレッドシート名
 
 # シークレット設定の確認とエラーハンドリング
 def get_api_keys():
@@ -118,40 +119,29 @@ def main():
         st.write(f"- 楽天Affiliate ID: {'✅ 設定済み' if 'AFFILIATE_ID' in globals() else '❌ 未設定'}")
         st.write(f"- Google Cloud認証: {'✅ 設定済み' if 'gcp_service_account' in st.secrets else '❌ 未設定'}")
 
-    # スプレッドシート名の設定
-    spreadsheet_name = st.text_input("スプレッドシート名", value="works", help="Google Sheetsのスプレッドシート名を入力してください")
-    
-    # 利用可能なスプレッドシートを確認するボタン
-    if st.button("📋 利用可能なスプレッドシートを確認"):
+    # 作品一覧スプレッドシートの存在確認ボタン
+    if st.button("📋 「作品一覧」シートの確認"):
         try:
             gc = get_gspread_client()
-            st.info("利用可能なスプレッドシートを取得中...")
-            spreadsheets = gc.list_spreadsheet_files()
-            if spreadsheets:
-                st.success(f"✅ {len(spreadsheets)}個のスプレッドシートが見つかりました：")
-                for sheet in spreadsheets[:10]:  # 最初の10個のみ表示
-                    st.write(f"- {sheet['name']} (ID: {sheet['id']})")
-                if len(spreadsheets) > 10:
-                    st.write(f"... および他{len(spreadsheets)-10}個")
-            else:
-                st.warning("⚠️ アクセス可能なスプレッドシートが見つかりません")
+            st.info("「作品一覧」シートを確認中...")
+            try:
+                spreadsheet = gc.open(SPREADSHEET_NAME)
+                st.success(f"✅ 「{SPREADSHEET_NAME}」シートが見つかりました (ID: {spreadsheet.id})")
+            except SpreadsheetNotFound:
+                st.error(f"❌ 「{SPREADSHEET_NAME}」シートが見つかりません。スプレッドシート名を確認するか、サービスアカウントにアクセス権限を付与してください。")
         except Exception as e:
-            st.error(f"❌ スプレッドシート一覧取得エラー: {e}")
+            st.error(f"❌ スプレッドシート確認エラー: {e}")
 
     if st.button("最新刊チェック開始 ▶️"):
-        if not spreadsheet_name.strip():
-            st.error("❌ スプレッドシート名を入力してください")
-            return
-            
-        st.info("Googleスプレッドシートを取得中...")
+        st.info(f"「{SPREADSHEET_NAME}」スプレッドシートを取得中...")
 
         try:
             gc = get_gspread_client()
-            spreadsheet = gc.open(spreadsheet_name)
+            spreadsheet = gc.open(SPREADSHEET_NAME)
             worksheet = spreadsheet.get_worksheet(0)
-            st.success(f"✅ スプレッドシート「{spreadsheet_name}」に接続しました")
+            st.success(f"✅ スプレッドシート「{SPREADSHEET_NAME}」に接続しました")
         except SpreadsheetNotFound:
-            st.error(f"❌ スプレッドシート「{spreadsheet_name}」が見つかりません。名前を確認するか、上記のボタンで利用可能なスプレッドシートを確認してください。")
+            st.error(f"❌ スプレッドシート「{SPREADSHEET_NAME}」が見つかりません。名前を確認するか、上記のボタンでスプレッドシートの確認をしてください。")
             return
         except APIError as e:
             st.error(f"❌ Google Sheets APIエラー: {e}")
