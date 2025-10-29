@@ -1,5 +1,6 @@
 import streamlit as st
 import gspread
+from gspread import SpreadsheetNotFound, APIError
 from google.oauth2.service_account import Credentials
 import requests
 import os
@@ -108,35 +109,129 @@ def main():
         st.write(f"- 楽天Affiliate ID: {'✅ 設定済み' if 'AFFILIATE_ID' in globals() else '❌ 未設定'}")
         st.write(f"- Google Cloud認証: {'✅ 設定済み' if 'gcp_service_account' in st.secrets else '❌ 未設定'}")
 
+    # スプレッドシート名の設定
+    spreadsheet_name = st.text_input("スプレッドシート名", value="works", help="Google Sheetsのスプレッドシート名を入力してください")
+    
+    # 利用可能なスプレッドシートを確認するボタン
+    if st.button("📋 利用可能なスプレッドシートを確認"):
+        try:
+            gc = get_gspread_client()
+            st.info("利用可能なスプレッドシートを取得中...")
+            spreadsheets = gc.list_spreadsheet_files()
+            if spreadsheets:
+                st.success(f"✅ {len(spreadsheets)}個のスプレッドシートが見つかりました：")
+                for sheet in spreadsheets[:10]:  # 最初の10個のみ表示
+                    st.write(f"- {sheet['name']} (ID: {sheet['id']})")
+                if len(spreadsheets) > 10:
+                    st.write(f"... および他{len(spreadsheets)-10}個")
+            else:
+                st.warning("⚠️ アクセス可能なスプレッドシートが見つかりません")
+        except Exception as e:
+            st.error(f"❌ スプレッドシート一覧取得エラー: {e}")
+
     if st.button("最新刊チェック開始 ▶️"):
+        if not spreadsheet_name.strip():
+            st.error("❌ スプレッドシート名を入力してください")
+            return
+            
         st.info("Googleスプレッドシートを取得中...")
 
-        gc = get_gspread_client()
-        spreadsheet = gc.open("works")
-        worksheet = spreadsheet.get_worksheet(0)
+        try:
+            gc = get_gspread_client()
+            spreadsheet = gc.open(spreadsheet_name)
+            worksheet = spreadsheet.get_worksheet(0)
+            st.success(f"✅ スプレッドシート「{spreadsheet_name}」に接続しました")
+        except gspread.SpreadsheetNotFound:
+            st.error(f"❌ スプレッドシート「{spreadsheet_name}」が見つかりません。名前を確認するか、上記のボタンで利用可能なスプレッドシートを確認してください。")
+            return
+        except gspread.APIError as e:
+            st.error(f"❌ Google Sheets APIエラー: {e}")
+            st.markdown("""
+            **考えられる原因:**
+            - スプレッドシートへのアクセス権限がない
+            - Google Sheets APIの利用制限に達した
+            - サービスアカウントがスプレッドシートを共有されていない
+            
+            **解決方法:**
+            1. スプレッドシートの共有設定を確認
+            2. サービスアカウント（manga-check@my-project-shimakiti-426301.iam.gserviceaccount.com）にアクセス権限を付与
+            3. しばらく時間をおいてから再試行
+            """)
+            return
+        except Exception as e:
+            st.error(f"❌ 予期しないエラー: {e}")
+            return
 
-        rows = worksheet.get_all_values()
-        st.success(f"{len(rows)-1}件の作品データを取得しました。")
+        # スプレッドシートからデータを取得
+        try:
+            rows = worksheet.get_all_values()
+            if not rows:
+                st.warning("⚠️ スプレッドシートにデータがありません")
+                return
+            st.success(f"✅ {len(rows)-1}件の作品データを取得しました")
+        except Exception as e:
+            st.error(f"❌ スプレッドシートデータ取得エラー: {e}")
+            return
 
-        data = []
-        for row in rows[1:]:
-            title = row[0] if len(row) > 0 else ""
-            search_title = row[1] if len(row) > 1 else ""
-            number = row[2] if len(row) > 2 else ""
-            data.append({"title": title, "search_title": search_title, "number": number})
+        # データ形式の確認と処理
+        try:
+            data = []
+            for i, row in enumerate(rows[1:], 1):  # ヘッダー行をスキップ
+                if len(row) < 3:
+                    st.warning(f"⚠️ 行{i+1}: データが不完全です（列数: {len(row)}）")
+                    continue
+                
+                title = row[0].strip() if len(row) > 0 else ""
+                search_title = row[1].strip() if len(row) > 1 else ""
+                number = row[2].strip() if len(row) > 2 else ""
+                
+                if not title:
+                    st.warning(f"⚠️ 行{i+1}: タイトルが空です")
+                    continue
+                    
+                data.append({
+                    "title": title, 
+                    "search_title": search_title, 
+                    "number": number
+                })
+            
+            if not data:
+                st.error("❌ 有効なデータが見つかりません")
+                return
+                
+            st.info(f"📊 {len(data)}件の有効なデータを処理します")
+            
+        except Exception as e:
+            st.error(f"❌ データ処理エラー: {e}")
+            return
 
+        # 楽天API検索の実行
         no = 0
         st.subheader("🔎 検索結果")
-        for item in data:
-            params = {
-                'applicationId': API_KEY,
-                'affiliateId': AFFILIATE_ID,
-                'title': item["title"],
-                'sort': '-releaseDate',
-                'hits': 30
-            }
-            result = get_books(params, item["search_title"], item["number"], int(no))
-            no = int(result)
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, item in enumerate(data):
+            progress_bar.progress((i + 1) / len(data))
+            status_text.text(f"検索中: {item['title']} ({i+1}/{len(data)})")
+            
+            try:
+                params = {
+                    'applicationId': API_KEY,
+                    'affiliateId': AFFILIATE_ID,
+                    'title': item["title"],
+                    'sort': '-releaseDate',
+                    'hits': 30
+                }
+                result = get_books(params, item["search_title"], item["number"], int(no))
+                no = int(result)
+            except Exception as e:
+                st.error(f"❌ 「{item['title']}」の検索でエラー: {e}")
+                continue
+        
+        progress_bar.empty()
+        status_text.empty()
 
         st.success("✅ 最新刊チェックが完了しました！")
 
