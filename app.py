@@ -229,7 +229,7 @@ def main():
                 result = get_books(params, item["search_title"], item["number"], 0)
                 if result:
                     results.append({
-                        "作品名": result["title"],
+                        "作品名": item["title"],
                         "巻数": result["volume"],
                         "出版日": result["sales_date"],
                         "ISBN": result["isbn"]
