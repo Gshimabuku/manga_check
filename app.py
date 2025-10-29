@@ -110,6 +110,31 @@ def get_books(params, search_title, num, no):
     return None
 
 
+# --- スプレッドシート更新機能 ---
+def update_spreadsheet(gc, worksheet, original_data, results):
+    """検索結果をもとにスプレッドシートの巻数を更新する"""
+    updated_count = 0
+    
+    for result in results:
+        original_index = result["original_index"]
+        new_volume = result["巻数"]
+        original_item = original_data[original_index]
+        current_volume = original_item["number"]
+        
+        # 巻数が異なる場合のみ更新
+        if str(new_volume) != str(current_volume):
+            # 行番号は1ベースで、ヘッダー行を考慮して+2
+            row_num = original_index + 2
+            worksheet.update_cell(row_num, 3, str(new_volume))  # 3列目が巻数
+            updated_count += 1
+            st.write(f"更新: {original_item['title']} の巻数を {current_volume} → {new_volume} に変更")
+    
+    if updated_count == 0:
+        st.info("更新する必要のある巻数はありませんでした")
+    else:
+        st.success(f"{updated_count}件の巻数を更新しました")
+
+
 # --- メイン ---
 def main():
     st.title("📚 楽天Books 最新巻チェック")
@@ -229,7 +254,9 @@ def main():
                 result = get_books(params, item["search_title"], item["number"], 0)
                 if result:
                     results.append({
-                        "作品名": item["title"],
+                        "original_index": i,  # 元データのインデックス
+                        "original_title": item["title"],  # 元のタイトル
+                        "作品名": result["title"],
                         "巻数": result["volume"],
                         "出版日": result["sales_date"],
                         "ISBN": result["isbn"]
@@ -246,9 +273,22 @@ def main():
         
         if results:
             import pandas as pd
-            df = pd.DataFrame(results)
+            # 表示用のDataFrameを作成（内部データを除外）
+            display_results = [{k: v for k, v in result.items() 
+                              if k not in ["original_index", "original_title"]} 
+                             for result in results]
+            df = pd.DataFrame(display_results)
             st.dataframe(df, use_container_width=True)
             st.success(f"✅ {len(results)}件の最新刊が見つかりました！")
+            
+            # スプレッドシート更新ボタン
+            if st.button("📝 スプレッドシートを更新"):
+                try:
+                    st.info("スプレッドシートを更新中...")
+                    update_spreadsheet(gc, worksheet, data, results)
+                    st.success("✅ スプレッドシートの更新が完了しました！")
+                except Exception as e:
+                    st.error(f"❌ スプレッドシート更新エラー: {e}")
         else:
             st.warning("⚠️ 条件に一致する最新刊は見つかりませんでした")
 
