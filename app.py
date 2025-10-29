@@ -1,6 +1,12 @@
 import streamlit as st
 import gspread
-from gspread import SpreadsheetNotFound, APIError
+# gspread moved exception classes into gspread.exceptions in newer versions.
+# Use a compatibility import so the app works with different gspread versions.
+try:
+    from gspread.exceptions import SpreadsheetNotFound, APIError
+except Exception:
+    # Fallback for older gspread versions that exported these at top-level
+    from gspread import SpreadsheetNotFound, APIError
 from google.oauth2.service_account import Credentials
 import requests
 import os
