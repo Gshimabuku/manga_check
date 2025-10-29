@@ -89,8 +89,7 @@ def get_books(params, search_title, num, no):
     params["page"] = 1
     response = requests.get(API_ENDPOINT, params=params)
     if response.status_code != 200:
-        st.error(f"エラー: {response.status_code} (page=1)")
-        return no
+        return None
 
     data = response.json()
     page_count = data.get("pageCount", 1)
@@ -102,10 +101,12 @@ def get_books(params, search_title, num, no):
         for book_item in books:
             book = book_item["Item"]
             if search_title in book["title"]:
-                no += 1
-                st.write(f'{no} : {book["title"]} | ISBN: {book["isbn"]} | 出版日: {book["salesDate"]}')
-                return no
-    return no
+                return {
+                    "title": book["title"],
+                    "isbn": book["isbn"],
+                    "sales_date": book["salesDate"]
+                }
+    return None
 
 
 # --- メイン ---
@@ -205,11 +206,12 @@ def main():
             return
 
         # 楽天API検索の実行
-        no = 0
-        st.subheader("🔎 検索結果")
+        st.subheader("🔎 検索実行中...")
         
         progress_bar = st.progress(0)
         status_text = st.empty()
+        
+        results = []  # 検索結果を格納するリスト
         
         for i, item in enumerate(data):
             progress_bar.progress((i + 1) / len(data))
@@ -223,14 +225,31 @@ def main():
                     'sort': '-releaseDate',
                     'hits': 30
                 }
-                result = get_books(params, item["search_title"], item["number"], int(no))
-                no = int(result)
+                result = get_books(params, item["search_title"], item["number"], 0)
+                if result:
+                    results.append({
+                        "作品名": item["title"],
+                        "最新刊タイトル": result["title"],
+                        "ISBN": result["isbn"],
+                        "出版日": result["sales_date"]
+                    })
             except Exception as e:
                 st.error(f"❌ 「{item['title']}」の検索でエラー: {e}")
                 continue
         
         progress_bar.empty()
         status_text.empty()
+
+        # 結果をテーブルで表示
+        st.subheader("🔎 検索結果")
+        
+        if results:
+            import pandas as pd
+            df = pd.DataFrame(results)
+            st.dataframe(df, use_container_width=True)
+            st.success(f"✅ {len(results)}件の最新刊が見つかりました！")
+        else:
+            st.warning("⚠️ 条件に一致する最新刊は見つかりませんでした")
 
         st.success("✅ 最新刊チェックが完了しました！")
 
