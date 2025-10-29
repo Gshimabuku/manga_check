@@ -139,6 +139,16 @@ def update_spreadsheet(gc, worksheet, original_data, results):
 def main():
     st.title("📚 楽天Books 最新巻チェック")
 
+    # セッション状態の初期化
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = None
+    if 'original_data' not in st.session_state:
+        st.session_state.original_data = None
+    if 'worksheet' not in st.session_state:
+        st.session_state.worksheet = None
+    if 'gc' not in st.session_state:
+        st.session_state.gc = None
+
     # デバッグ情報（開発時のみ表示）
     if st.checkbox("設定情報を表示（デバッグ用）"):
         st.write("**設定状況:**")
@@ -268,27 +278,49 @@ def main():
         progress_bar.empty()
         status_text.empty()
 
+        # 検索結果をセッション状態に保存
+        st.session_state.search_results = results
+        st.session_state.original_data = data
+        st.session_state.worksheet = worksheet
+        st.session_state.gc = gc
+
+    # 検索結果の表示（セッション状態から）
+    if st.session_state.search_results is not None:
         # 結果をテーブルで表示
         st.subheader("🔎 検索結果")
         
-        if results:
+        if st.session_state.search_results:
             import pandas as pd
             # 表示用のDataFrameを作成（内部データを除外）
             display_results = [{k: v for k, v in result.items() 
                               if k not in ["original_index", "original_title"]} 
-                             for result in results]
+                             for result in st.session_state.search_results]
             df = pd.DataFrame(display_results)
             st.dataframe(df, use_container_width=True)
-            st.success(f"✅ {len(results)}件の最新刊が見つかりました！")
+            st.success(f"✅ {len(st.session_state.search_results)}件の最新刊が見つかりました！")
             
-            # スプレッドシート更新ボタン
-            if st.button("📝 スプレッドシートを更新"):
-                try:
-                    st.info("スプレッドシートを更新中...")
-                    update_spreadsheet(gc, worksheet, data, results)
-                    st.success("✅ スプレッドシートの更新が完了しました！")
-                except Exception as e:
-                    st.error(f"❌ スプレッドシート更新エラー: {e}")
+            # ボタンを並べて配置
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # スプレッドシート更新ボタン
+                if st.button("📝 スプレッドシートを更新"):
+                    try:
+                        st.info("スプレッドシートを更新中...")
+                        update_spreadsheet(st.session_state.gc, st.session_state.worksheet, 
+                                         st.session_state.original_data, st.session_state.search_results)
+                        st.success("✅ スプレッドシートの更新が完了しました！")
+                    except Exception as e:
+                        st.error(f"❌ スプレッドシート更新エラー: {e}")
+            
+            with col2:
+                # 結果をクリアするボタン
+                if st.button("🗑️ 検索結果をクリア"):
+                    st.session_state.search_results = None
+                    st.session_state.original_data = None
+                    st.session_state.worksheet = None
+                    st.session_state.gc = None
+                    st.rerun()
         else:
             st.warning("⚠️ 条件に一致する最新刊は見つかりませんでした")
 
