@@ -5,17 +5,33 @@ import requests
 
 # --- APIキー・認証設定 ---
 API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
-API_KEY = st.secrets["rakuten"]["applicationId"]
-AFFILIATE_ID = st.secrets["rakuten"]["affiliateId"]
+
+# シークレット設定の確認とエラーハンドリング
+try:
+    API_KEY = st.secrets["rakuten"]["applicationId"]
+    AFFILIATE_ID = st.secrets["rakuten"]["affiliateId"]
+except KeyError as e:
+    st.error(f"設定エラー: 楽天APIキーが見つかりません。管理者に連絡してください。\nエラー詳細: {e}")
+    st.stop()
+except Exception as e:
+    st.error(f"予期しないエラーが発生しました: {e}")
+    st.stop()
 
 
 # --- Google Sheets認証 ---
 def get_gspread_client():
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    )
-    return gspread.authorize(creds)
+    try:
+        creds = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+        )
+        return gspread.authorize(creds)
+    except KeyError as e:
+        st.error(f"設定エラー: Google Cloud認証情報が見つかりません。管理者に連絡してください。\nエラー詳細: {e}")
+        st.stop()
+    except Exception as e:
+        st.error(f"Google Sheets認証でエラーが発生しました: {e}")
+        st.stop()
 
 
 # --- 楽天Books API ---
@@ -45,6 +61,13 @@ def get_books(params, search_title, num, no):
 # --- メイン ---
 def main():
     st.title("📚 楽天Books 最新巻チェック")
+
+    # デバッグ情報（開発時のみ表示）
+    if st.checkbox("設定情報を表示（デバッグ用）"):
+        st.write("**設定状況:**")
+        st.write(f"- 楽天API Key: {'✅ 設定済み' if 'API_KEY' in globals() else '❌ 未設定'}")
+        st.write(f"- 楽天Affiliate ID: {'✅ 設定済み' if 'AFFILIATE_ID' in globals() else '❌ 未設定'}")
+        st.write(f"- Google Cloud認証: {'✅ 設定済み' if 'gcp_service_account' in st.secrets else '❌ 未設定'}")
 
     if st.button("最新刊チェック開始 ▶️"):
         st.info("Googleスプレッドシートを取得中...")
