@@ -175,17 +175,25 @@ def main():
             st.error(f"❌ スプレッドシート内容取得エラー: {e}")
 
     if st.button("最新刊チェック開始 ▶️"):
-        st.info(f"「{SPREADSHEET_NAME}」スプレッドシートを取得中...")
+        # 進捗表示用のプレースホルダーを作成
+        progress_placeholder = st.empty()
+        
+        with progress_placeholder.container():
+            st.info(f"「{SPREADSHEET_NAME}」スプレッドシートを取得中...")
 
         try:
             gc = get_gspread_client()
             spreadsheet = gc.open(SPREADSHEET_NAME)
             worksheet = spreadsheet.get_worksheet(0)
-            st.success(f"✅ スプレッドシート「{SPREADSHEET_NAME}」に接続しました")
+            
+            with progress_placeholder.container():
+                st.success(f"✅ スプレッドシート「{SPREADSHEET_NAME}」に接続しました")
         except SpreadsheetNotFound:
+            progress_placeholder.empty()
             st.error(f"❌ スプレッドシート「{SPREADSHEET_NAME}」が見つかりません。名前を確認するか、上記のボタンでスプレッドシートの確認をしてください。")
             return
         except APIError as e:
+            progress_placeholder.empty()
             st.error(f"❌ Google Sheets APIエラー: {e}")
             st.markdown("""
             **考えられる原因:**
@@ -200,6 +208,7 @@ def main():
             """)
             return
         except Exception as e:
+            progress_placeholder.empty()
             st.error(f"❌ 予期しないエラー: {e}")
             return
 
@@ -207,10 +216,14 @@ def main():
         try:
             rows = worksheet.get_all_values()
             if not rows:
+                progress_placeholder.empty()
                 st.warning("⚠️ スプレッドシートにデータがありません")
                 return
-            st.success(f"✅ {len(rows)-1}件の作品データを取得しました")
+            
+            with progress_placeholder.container():
+                st.success(f"✅ {len(rows)-1}件の作品データを取得しました")
         except Exception as e:
+            progress_placeholder.empty()
             st.error(f"❌ スプレッドシートデータ取得エラー: {e}")
             return
 
@@ -237,20 +250,23 @@ def main():
                 })
             
             if not data:
+                progress_placeholder.empty()
                 st.error("❌ 有効なデータが見つかりません")
                 return
                 
-            st.info(f"📊 {len(data)}件の有効なデータを処理します")
+            with progress_placeholder.container():
+                st.info(f"📊 {len(data)}件の有効なデータを処理します")
             
         except Exception as e:
+            progress_placeholder.empty()
             st.error(f"❌ データ処理エラー: {e}")
             return
 
         # 楽天API検索の実行
-        st.subheader("🔎 検索実行中...")
-        
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        with progress_placeholder.container():
+            st.subheader("🔎 検索実行中...")
+            progress_bar = st.progress(0)
+            status_text = st.empty()
         
         results = []  # 検索結果を格納するリスト
         
@@ -280,8 +296,8 @@ def main():
                 st.error(f"❌ 「{item['title']}」の検索でエラー: {e}")
                 continue
         
-        progress_bar.empty()
-        status_text.empty()
+        # 進捗表示をクリア
+        progress_placeholder.empty()
 
         # 検索結果をセッション状態に保存
         st.session_state.search_results = results
