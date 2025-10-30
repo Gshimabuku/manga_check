@@ -9,7 +9,6 @@ except Exception:
     from gspread import SpreadsheetNotFound, APIError
 from google.oauth2.service_account import Credentials
 import requests
-import os
 
 # --- APIキー・認証設定 ---
 API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
@@ -17,43 +16,19 @@ SPREADSHEET_NAME = st.secrets["env"]["sheet_name"]  # スプレッドシート�
 
 # シークレット設定の確認とエラーハンドリング
 def get_api_keys():
-    """APIキーを複数の方法で取得を試みる"""
     api_key = None
     affiliate_id = None
-    
-    # 方法1: Streamlit secrets
+
+    # Streamlit secrets から設定値を取得
     try:
         api_key = st.secrets["rakuten"]["applicationId"]
         affiliate_id = st.secrets["rakuten"]["affiliateId"]
         st.success("✅ Streamlit secretsから設定を読み込みました")
         return api_key, affiliate_id
     except KeyError:
-        st.warning("⚠️ Streamlit secretsで楽天設定が見つかりません")
+        st.warning("⚠️ Streamlit secretsで楽天BooksAPIの設定が見つかりません")
     except Exception as e:
         st.warning(f"⚠️ Streamlit secrets読み込みエラー: {e}")
-    
-    # 方法2: 環境変数
-    try:
-        api_key = os.getenv("RAKUTEN_APPLICATION_ID")
-        affiliate_id = os.getenv("RAKUTEN_AFFILIATE_ID")
-        if api_key and affiliate_id:
-            st.success("✅ 環境変数から設定を読み込みました")
-            return api_key, affiliate_id
-        else:
-            st.warning("⚠️ 環境変数に楽天設定が見つかりません")
-    except Exception as e:
-        st.warning(f"⚠️ 環境変数読み込みエラー: {e}")
-    
-    # 方法3: デフォルト値（開発用）
-    if not api_key or not affiliate_id:
-        st.error("❌ 楽天APIキーが見つかりません。以下のいずれかの方法で設定してください：")
-        st.markdown("""
-        **設定方法:**
-        1. `.streamlit/secrets.toml` に設定を追加
-        2. 環境変数 `RAKUTEN_APPLICATION_ID` と `RAKUTEN_AFFILIATE_ID` を設定
-        3. Streamlit Cloud の場合、アプリ設定でSecretsを追加
-        """)
-        st.stop()
     
     return api_key, affiliate_id
 
@@ -137,7 +112,7 @@ def update_spreadsheet(gc, worksheet, original_data, results):
 
 # --- メイン ---
 def main():
-    st.title("📚 楽天Books 最新巻チェック")
+    st.title("📚 最新巻チェック")
 
     # セッション状態の初期化
     if 'search_results' not in st.session_state:
@@ -163,7 +138,7 @@ def main():
             st.info("「作品一覧」シートを確認中...")
             try:
                 spreadsheet = gc.open(SPREADSHEET_NAME)
-                st.success(f"✅ 「{SPREADSHEET_NAME}」シートが見つかりました (ID: {spreadsheet.id})")
+                st.success(f"✅ 「{SPREADSHEET_NAME}」シートが見つかりました")
             except SpreadsheetNotFound:
                 st.error(f"❌ 「{SPREADSHEET_NAME}」シートが見つかりません。スプレッドシート名を確認するか、サービスアカウントにアクセス権限を付与してください。")
         except Exception as e:
