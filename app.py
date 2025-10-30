@@ -23,7 +23,6 @@ def get_api_keys():
     try:
         api_key = st.secrets["rakuten"]["applicationId"]
         affiliate_id = st.secrets["rakuten"]["affiliateId"]
-        st.success("✅ Streamlit secretsから設定を読み込みました")
         return api_key, affiliate_id
     except KeyError:
         st.warning("⚠️ Streamlit secretsで楽天BooksAPIの設定が見つかりません")
