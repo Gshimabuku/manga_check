@@ -13,7 +13,7 @@ import os
 
 # --- APIキー・認証設定 ---
 API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
-SPREADSHEET_NAME = "作品一覧"  # 固定のスプレッドシート名
+SPREADSHEET_NAME = st.secrets["env"]["sheet_name"]  # スプレッドシート名
 
 # シークレット設定の確認とエラーハンドリング
 def get_api_keys():
