@@ -9,6 +9,8 @@ except Exception:
     from gspread import SpreadsheetNotFound, APIError
 from google.oauth2.service_account import Credentials
 import requests
+from datetime import datetime
+import re
 
 # --- APIキー・認証設定 ---
 API_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
@@ -57,6 +59,22 @@ def get_gspread_client():
         st.error(f"Google Sheets認証でエラーが発生しました: {e}")
         st.stop()
 
+# --- 日付判定 ---
+def is_past(date_str: str) -> bool:
+    # 1. 数字と「年」「月」「日」だけを残す
+    cleaned = re.match(r"(\d{4}年\d{1,2}月\d{1,2}日)", date_str)
+    if not cleaned:
+        raise ValueError(f"日付形式を抽出できません: {date_str}")
+
+    pure_date = cleaned.group(1)  # 例: "2026年01月05日"
+
+    # 2. datetime に変換
+    target_date = datetime.strptime(pure_date, "%Y年%m月%d日").date()
+    today = datetime.now().date()
+
+    # 3. 今日より前か判定
+    return target_date < today
+
 
 # --- 楽天Books API ---
 def get_books(params, search_title, num, no):
@@ -74,13 +92,14 @@ def get_books(params, search_title, num, no):
         search_title = search_title.replace("num", str(num))
         for book_item in books:
             book = book_item["Item"]
-            if search_title in book["title"]:
-                return {
-                    "title": book["title"],
-                    "volume": str(num),  # 巻数
-                    "isbn": book["isbn"],
-                    "sales_date": book["salesDate"]
-                }
+            if is_past(book["salesDate"]):
+                if search_title in book["title"]:
+                    return {
+                        "title": book["title"],
+                        "volume": str(num),  # 巻数
+                        "isbn": book["isbn"],
+                        "sales_date": book["salesDate"]
+                    }
     return None
 
 
