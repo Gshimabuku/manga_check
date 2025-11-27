@@ -61,7 +61,7 @@ def get_gspread_client():
 
 # --- 日付判定 ---
 def is_past(date_str: str) -> bool:
-    test = datetime(2026, 5, 1)
+    test = datetime(2026, 1, 6)
     # today = datetime.now().date()
     today = test.date()
 
