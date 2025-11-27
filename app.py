@@ -62,8 +62,10 @@ def get_gspread_client():
 # --- 日付判定 ---
 def is_past(date_str: str) -> bool:
     test = datetime(2025, 5, 1)
+    st.info(test)
     # today = datetime.now().date()
     today = test.date()
+    st.info(today)
 
     # --- 1) 日付ありパターン（YYYY年MM月DD日） ---
     full_date = re.match(r"(\d{4}年\d{1,2}月\d{1,2}日)", date_str)
