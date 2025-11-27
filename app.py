@@ -259,7 +259,7 @@ def main():
         try:
             data = []
             for i, row in enumerate(rows[1:], 1):  # ヘッダー行をスキップ
-                if len(row) < 3:
+                if len(row) < 4:
                     st.warning(f"⚠️ 行{i+1}: データが不完全です（列数: {len(row)}）")
                     continue
                 
@@ -275,7 +275,7 @@ def main():
                 data.append({
                     "title": title, 
                     "search_title": search_title, 
-                    "number": number
+                    "number": number,
                     "sales_date": sales_date
                 })
             
