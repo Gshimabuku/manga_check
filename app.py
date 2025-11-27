@@ -128,6 +128,7 @@ def update_spreadsheet(gc, worksheet, original_data, results):
             # 行番号は1ベースで、ヘッダー行を考慮して+2
             row_num = original_index + 2
             worksheet.update_cell(row_num, 3, str(new_volume))  # 3列目が巻数
+            worksheet.update_cell(row_num, 4, str(result["出版日"]))
             updated_count += 1
             st.write(f"更新: {original_item['title']} の巻数を {current_volume} → {new_volume} に変更")
     
@@ -265,6 +266,7 @@ def main():
                 title = row[0].strip() if len(row) > 0 else ""
                 search_title = row[1].strip() if len(row) > 1 else ""
                 number = row[2].strip() if len(row) > 2 else ""
+                sales_date = row[3].strip() if len(row) > 3 else ""
                 
                 if not title:
                     st.warning(f"⚠️ 行{i+1}: タイトルが空です")
@@ -274,6 +276,7 @@ def main():
                     "title": title, 
                     "search_title": search_title, 
                     "number": number
+                    "sales_date": sales_date
                 })
             
             if not data:
