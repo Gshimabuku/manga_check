@@ -61,19 +61,28 @@ def get_gspread_client():
 
 # --- 日付判定 ---
 def is_past(date_str: str) -> bool:
-    # 1. 数字と「年」「月」「日」だけを残す
-    cleaned = re.match(r"(\d{4}年\d{1,2}月\d{1,2}日)", date_str)
-    if not cleaned:
-        raise ValueError(f"日付形式を抽出できません: {date_str}")
-
-    pure_date = cleaned.group(1)  # 例: "2026年01月05日"
-
-    # 2. datetime に変換
-    target_date = datetime.strptime(pure_date, "%Y年%m月%d日").date()
     today = datetime.now().date()
 
-    # 3. 今日より前か判定
-    return target_date < today
+    # --- 1) 日付ありパターン（YYYY年MM月DD日） ---
+    full_date = re.match(r"(\d{4}年\d{1,2}月\d{1,2}日)", date_str)
+    if full_date:
+        pure_date = full_date.group(1)
+        target_date = datetime.strptime(pure_date, "%Y年%m月%d日").date()
+        return target_date < today
+
+    # --- 2) 日付なし（月までの表記）例：「2025年05月下旬」「2025年05月」 ---
+    month_only = re.match(r"(\d{4}年\d{1,2}月)", date_str)
+    if month_only:
+        pure_month = month_only.group(1)
+        target_month = datetime.strptime(pure_month, "%Y年%m月").date()
+
+        # 月比較：年と月で判定する
+        today_year_month = today.year * 100 + today.month
+        target_year_month = target_month.year * 100 + target_month.month
+
+        return target_year_month < today_year_month
+
+    raise ValueError(f"日付形式を解釈できません: {date_str}")
 
 
 # --- 楽天Books API ---
